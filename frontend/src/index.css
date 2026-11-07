@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  font-family: Inter, "Segoe UI", sans-serif;
+  background: #0b1020;
+  color: #f8fafc;
+}
+
+html, body, #root {
+  margin: 0;
+  min-height: 100%;
+  min-width: 0;
+  height: 100%;
+  background: radial-gradient(circle at top, rgba(99, 102, 241, 0.18), rgba(15, 23, 42, 0.96) 35%, #090d1a 100%);
+  color: #f8fafc;
+}
+
+body {
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button, textarea {
+  font: inherit;
+}
+
+.cortex-markdown {
+  color: #f8fafc;
+}
+
+.cortex-markdown h1,
+.cortex-markdown h2,
+.cortex-markdown h3,
+.cortex-markdown h4,
+.cortex-markdown h5,
+.cortex-markdown h6 {
+  color: #ffffff;
+}
+
+.cortex-markdown p,
+.cortex-markdown li,
+.cortex-markdown td,
+.cortex-markdown th,
+.cortex-markdown strong,
+.cortex-markdown em {
+  color: #e2e8f0;
+}
+
+.cortex-markdown code {
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.cortex-markdown pre {
+  margin: 0.75rem 0;
+  border-radius: 0.75rem;
+  overflow-x: auto;
+}
+
+.cortex-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cortex-markdown th,
+.cortex-markdown td {
+  vertical-align: top;
+}
+
+.cortex-markdown a {
+  color: #a5b4fc;
+}
+
+.cortex-markdown hr {
+  border-color: rgba(165, 180, 252, 0.25);
+  margin: 1rem 0;
+}
