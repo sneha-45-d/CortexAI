@@ -35,24 +35,14 @@ architecture,
 API design.
 
 pdf:
-Questions about generating PDFs,
-PDF content,
-document context,
-analyzing or working with PDF documents.
+Questions about an attached PDF,
+summarizing or extracting information from documents,
+answering questions using a document.
 
 ppt:
 Questions about generating PPTs,
 PowerPoint presentations,
 PPT content or context.
-
-vision:
-Questions about images,
-image analysis,
-understanding images,
-describing images,
-reading text from images,
-analyzing screenshots,
-image-based questions.
 
 Return ONLY ONE word:
 
@@ -61,7 +51,6 @@ search
 coding
 pdf
 ppt
-vision
 
 User Query:
 ${state.prompt}`

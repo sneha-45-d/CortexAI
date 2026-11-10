@@ -1,8 +1,8 @@
-import React from "react";
 import { useSelector } from "react-redux";
 import MessageBubble from "./MessageBubble";
+import { LoaderCircle } from "lucide-react";
 
-const MessageList = () => {
+const MessageList = ({ isLoading = false, loadingLabel = "" }) => {
   const { selectedConversation } = useSelector(
     (state) => state.conversation
   );
@@ -45,8 +45,15 @@ const MessageList = () => {
                 role={msg.role}
                 content={msg.content}
                 images={Array.isArray(msg.images) ? msg.images : []}
+                artifacts={Array.isArray(msg.artifacts) ? msg.artifacts : []}
               />
             ))}
+            {isLoading && (
+              <div className="mb-4 flex items-center gap-2 text-sm text-violet-200" role="status" aria-live="polite">
+                <LoaderCircle size={16} className="animate-spin" />
+                {loadingLabel || "Working..."}
+              </div>
+            )}
           </div>
         )}
       </div>

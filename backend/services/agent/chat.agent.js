@@ -1,7 +1,6 @@
 import dotenv from "dotenv";
 import { ChatGroq } from "@langchain/groq";
 import { buildMemoryContext } from "../../shared/memory/memory.js";
-import { visionAgent } from "./vision.agent.js";
 
 dotenv.config({ path: new URL("./.env", import.meta.url) });
 
@@ -77,14 +76,6 @@ Focus on:
 - Returning polished, presentation-ready content.
 - Use clean Markdown with tables for slide plans and a "Key characteristics" section.`,
 
-  image: `You are the CortexAI image and visual assistant.
-
-Focus on:
-- Describing scene composition, lighting, style, and mood.
-- Explaining visible content clearly and accurately.
-- Suggesting creative directions for brand, product, and UI imagery.
-- Keeping answers practical, inspiring, and concise.
-- When analyzing an image, organize observations in a table with columns such as Element, Observation, and Confidence, followed by key characteristics.`
 };
 
 const getGroqModel = () => {
@@ -135,25 +126,29 @@ const getGrokModelResponse = async ({ history, prompt, systemPrompt }) => {
 
 const getCurrentTimeResponse = (prompt) => {
   const query = String(prompt || "").toLowerCase();
-  if (!/(current time|what time is it|time now|current date|today's date|date today|what is the date)/i.test(query)) {
+  if (!/(current time|what time is it|time now|current date|today(?:'s)? date|date today|what is the date|what date is it)/i.test(query)) {
     return null;
   }
 
+  const timeZone = process.env.APP_TIME_ZONE || "Asia/Kolkata";
   const now = new Date();
-  const time = now.toLocaleTimeString([], {
-    hour: "2-digit",
+  const time = new Intl.DateTimeFormat("en-IN", {
+    timeZone,
+    hour: "numeric",
     minute: "2-digit",
     second: "2-digit",
+    hour12: true,
   });
-  const date = now.toLocaleDateString([], {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
+  const date = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
     day: "numeric",
-  });
+    month: "long",
+    year: "numeric",
+  }).format(now);
+  const localTime = time.format(now);
 
   return {
-    aiResponse: `## Current time\n\nThe current time is **${time}**.\n\n**Date:** ${date}.\n\nWant to know more related to this?`,
+    aiResponse: `## Current time\n\nThe current time is **${localTime}** (${timeZone}).\n\n**Date:** ${date}.\n\nWant to know more related to this?`,
     images: [],
   };
 };
@@ -251,28 +246,24 @@ const getSearchResponse = async (prompt) => {
   };
 };
 
-export const chatAgent = async ({ prompt, messages = [], agentId = "chat", images = [], userId = "anonymous" }) => {
+export const chatAgent = async ({
+  prompt,
+  messages = [],
+  agentId = "chat",
+  userId = "anonymous",
+}) => {
   if (!prompt || !String(prompt).trim()) {
     throw new Error("Prompt is required");
   }
 
   const normalizedAgentId = agentId === "research" ? "search" : agentId;
 
-  if (normalizedAgentId === "image") {
-    return visionAgent({
-      prompt: String(prompt).trim(),
-      images,
-      messages,
-      userId,
-    });
+  const currentTimeResponse = getCurrentTimeResponse(prompt);
+  if (currentTimeResponse) {
+    return currentTimeResponse;
   }
 
   if (normalizedAgentId === "search") {
-    const currentTimeResponse = getCurrentTimeResponse(prompt);
-    if (currentTimeResponse) {
-      return currentTimeResponse;
-    }
-
     if (process.env.TAVILY_API_KEY) {
       try {
         return await getSearchResponse(String(prompt).trim());
@@ -342,6 +333,6 @@ export const chatAgent = async ({ prompt, messages = [], agentId = "chat", image
 
   return {
     aiResponse: String(aiResponse || "I am here to help.").trim(),
-    images: Array.isArray(images) ? images : [],
+    images: [],
   };
 };

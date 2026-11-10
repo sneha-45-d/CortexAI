@@ -93,7 +93,14 @@ export const updateConversation = async (req, res) => {
 
 export const saveMessage = async (req, res) => {
   try {
-    const { conversationId, ConversationId, role, content, images = [] } = req.body || {};
+    const {
+      conversationId,
+      ConversationId,
+      role,
+      content,
+      images = [],
+      artifacts = [],
+    } = req.body || {};
     const resolvedConversationId = conversationId || ConversationId;
 
     if (!resolvedConversationId) {
@@ -106,6 +113,9 @@ export const saveMessage = async (req, res) => {
     }
 
     const normalizedImages = Array.isArray(images) ? images.filter(Boolean).map((image) => String(image)) : [];
+    const normalizedArtifacts = Array.isArray(artifacts) ? artifacts.filter((artifact) =>
+      artifact && typeof artifact === "object" && typeof artifact.type === "string"
+    ) : [];
 
     if (isDbConnected()) {
       const message = await Message.create({
@@ -113,12 +123,13 @@ export const saveMessage = async (req, res) => {
         content: cleanContent || "",
         role,
         images: normalizedImages,
+        artifacts: normalizedArtifacts,
       });
 
       if (role === "user") {
         const conversation = await Conversation.findById(resolvedConversationId);
         if (conversation) {
-          const title = normalizeConversationTitle(conversation.title === "New Chat" ? (cleanContent || `Image chat (${normalizedImages.length})`) : conversation.title);
+          const title = normalizeConversationTitle(conversation.title === "New Chat" ? cleanContent : conversation.title);
           await Conversation.findByIdAndUpdate(resolvedConversationId, { title, updatedAt: new Date() });
         }
       }
@@ -135,6 +146,7 @@ export const saveMessage = async (req, res) => {
       content: cleanContent || "",
       role,
       images: normalizedImages,
+      artifacts: normalizedArtifacts,
       createdAt: now,
     };
     const arr = inMemory.messages.get(resolvedConversationId) || [];
@@ -145,7 +157,7 @@ export const saveMessage = async (req, res) => {
       for (const [user, list] of inMemory.conversations.entries()) {
         const conv = list.find((c) => String(c._id) === String(resolvedConversationId));
         if (conv) {
-          conv.title = normalizeConversationTitle(conv.title === "New Chat" ? (cleanContent || `Image chat (${normalizedImages.length})`) : conv.title);
+          conv.title = normalizeConversationTitle(conv.title === "New Chat" ? cleanContent : conv.title);
           conv.updatedAt = now;
         }
       }

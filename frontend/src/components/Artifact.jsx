@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSelector } from "react-redux";
 import { motion } from "motion/react";
-import { Check, Code2, Copy, Eye, PanelRightClose, X } from "lucide-react";
+import { Check, Code2, Copy, Download, Eye, FileText, PanelRightClose, Presentation, X } from "lucide-react";
 
 function Artifact({ onClose }) {
   const [copied, setCopied] = useState(false);
@@ -14,6 +14,9 @@ function Artifact({ onClose }) {
   const content = String(artifact.content || "");
   const language = String(artifact.language || "text").toLowerCase();
   const canRenderHtml = ["html", "htm"].includes(language);
+  const isPdf = artifact.type === "pdf";
+  const isPptx = artifact.type === "pptx";
+  const isBinaryDocument = isPdf || isPptx;
 
   const handleCopy = async () => {
     try {
@@ -23,6 +26,17 @@ function Artifact({ onClose }) {
     } catch (error) {
       console.error("Failed to copy artifact:", error);
     }
+  };
+
+  const handleDownload = () => {
+    const bytes = Uint8Array.from(atob(content), (character) => character.charCodeAt(0));
+    const blob = new Blob([bytes], { type: artifact.mimeType || "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = artifact.fileName || (isPptx ? "cortexai-presentation.pptx" : "cortexai-document.pdf");
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
@@ -44,7 +58,11 @@ function Artifact({ onClose }) {
          </button>
          <div className="flex min-w-0 flex-1 items-center gap-2">
            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-indigo-500/20 bg-indigo-500/10">
-             <Code2 className="text-indigo-400" size={12} />
+             {isPptx
+               ? <Presentation className="text-indigo-400" size={12} />
+               : isPdf
+                 ? <FileText className="text-indigo-400" size={12} />
+                 : <Code2 className="text-indigo-400" size={12} />}
            </div>
            <div className="truncate text-[13px] font-medium text-slate-200">
              {artifact.prompt || artifact.title}
@@ -57,6 +75,18 @@ function Artifact({ onClose }) {
            {artifact.fileName || language}
          </span>
          <div className="flex items-center gap-1">
+           {isBinaryDocument ? (
+             <button
+               type="button"
+               onClick={handleDownload}
+               aria-label={`Download generated ${isPptx ? "PowerPoint" : "PDF"}`}
+               className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] text-slate-300 transition hover:bg-white/[0.06] hover:text-white"
+             >
+               <Download size={13} />
+               Download
+             </button>
+           ) : (
+             <>
            <button
              type="button"
              onClick={handleCopy}
@@ -75,10 +105,14 @@ function Artifact({ onClose }) {
              <Eye size={13} />
              Preview
            </button>
+             </>
+           )}
          </div>
        </div>
        <pre className="flex-1 overflow-auto whitespace-pre-wrap break-words p-4 text-[11px] leading-relaxed text-slate-300">
-         {content}
+         {isBinaryDocument
+           ? `Your ${isPptx ? "PowerPoint presentation" : "PDF"} is ready to download.`
+           : content}
        </pre>
        </div>
      </div>
@@ -98,7 +132,7 @@ function Artifact({ onClose }) {
              <X size={16} />
            </button>
          </div>
-         {canRenderHtml ? (
+         {canRenderHtml && !isBinaryDocument ? (
            <iframe
              title="Artifact preview"
              srcDoc={content}

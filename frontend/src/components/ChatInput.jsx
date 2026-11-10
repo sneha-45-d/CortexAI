@@ -5,7 +5,7 @@ import {
   Bot,
   Code2,
   FileText,
-  ImageIcon,
+  LoaderCircle,
   Mic,
   Paperclip,
   Presentation,
@@ -47,20 +47,15 @@ const AGENTS = [
     icon: Presentation,
     accent: "from-pink-500 to-rose-600",
   },
-  {
-    id: "image",
-    label: "Image",
-    icon: ImageIcon,
-    accent: "from-violet-500 to-fuchsia-600",
-  },
 ];
 
-const ChatInput = ({ onSend }) => {
+const ChatInput = ({ onSend, isLoading = false }) => {
   const dispatch = useDispatch();
 
   const [value, setValue] = useState("");
   const [selectedAgentId, setSelectedAgentId] = useState("chat");
-  const [selectedImages, setSelectedImages] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [fileError, setFileError] = useState("");
 
   const fileInputRef = useRef(null);
 
@@ -71,69 +66,36 @@ const ChatInput = ({ onSend }) => {
   const selectedAgent =
     AGENTS.find((agent) => agent.id === selectedAgentId) ?? AGENTS[0];
 
-  // ---------------------------------------
-  // IMAGE SELECT
-  // ---------------------------------------
-
-  const handleImageSelect = (event) => {
-    const files = Array.from(event.target.files || []);
-
-    if (!files.length) return;
-
-    const imageFiles = files.filter((file) =>
-      file.type.startsWith("image/")
-    );
-
-    if (!imageFiles.length) return;
-
-    Promise.all(
-      imageFiles.map(
-        (file) =>
-          new Promise((resolve, reject) => {
-            const reader = new FileReader();
-
-            reader.onload = () => {
-              resolve({
-                name: file.name,
-                dataUrl: reader.result,
-              });
-            };
-
-            reader.onerror = () => {
-              reject(
-                new Error(`Failed to read ${file.name}`)
-              );
-            };
-
-            reader.readAsDataURL(file);
-          })
-      )
-    )
-      .then((results) => {
-        setSelectedImages((current) => [
-          ...current,
-          ...results,
-        ]);
-      })
-      .catch((error) => {
-        console.error(
-          "Failed to read selected images:",
-          error
-        );
-      });
-
-    // Allow selecting the same file again
+  const handleFileSelect = (event) => {
+    const file = event.target.files?.[0];
     event.target.value = "";
-  };
 
-  // ---------------------------------------
-  // REMOVE IMAGE
-  // ---------------------------------------
+    if (!file) return;
 
-  const removeImage = (imageName) => {
-    setSelectedImages((current) =>
-      current.filter((image) => image.name !== imageName)
-    );
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    if (!["pdf", "pptx"].includes(extension)) {
+      setFileError("Choose a PDF or PowerPoint (.pptx) file.");
+      return;
+    }
+
+    if (file.size > 7 * 1024 * 1024) {
+      setFileError("Files must be 7 MB or smaller.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        setFileError(`Failed to read ${file.name}.`);
+        return;
+      }
+
+      setSelectedFile({ name: file.name, dataUrl: reader.result });
+      setSelectedAgentId(extension === "pdf" ? "pdf" : "ppt");
+      setFileError("");
+    };
+    reader.onerror = () => setFileError(`Failed to read ${file.name}.`);
+    reader.readAsDataURL(file);
   };
 
   // ---------------------------------------
@@ -145,9 +107,7 @@ const ChatInput = ({ onSend }) => {
 
     const trimmedValue = value.trim();
 
-    if (!trimmedValue && !selectedImages.length) {
-      return;
-    }
+    if (!trimmedValue && !selectedFile) return;
 
     try {
       // Send request to parent
@@ -155,7 +115,7 @@ const ChatInput = ({ onSend }) => {
         trimmedValue,
         selectedConversation,
         selectedAgentId,
-        selectedImages
+        selectedFile
       );
 
       // ---------------------------------------
@@ -170,7 +130,8 @@ const ChatInput = ({ onSend }) => {
 
       // Clear input after successful request
       setValue("");
-      setSelectedImages([]);
+      setSelectedFile(null);
+      setFileError("");
     } catch (error) {
       console.error(
         "Failed to send message:",
@@ -198,9 +159,9 @@ const ChatInput = ({ onSend }) => {
                 <button
                   key={id}
                   type="button"
-                  onClick={() =>
-                    setSelectedAgentId(id)
-                  }
+                  onClick={() => {
+                    setSelectedAgentId(id);
+                  }}
                   className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
                     isSelected
                       ? "border-indigo-500/40 bg-indigo-500/10 text-white shadow-lg shadow-indigo-950/30"
@@ -220,33 +181,25 @@ const ChatInput = ({ onSend }) => {
           )}
         </div>
 
-        {/* SELECTED IMAGES */}
-        {selectedImages.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {selectedImages.map((image) => (
-              <div
-                key={image.name}
-                className="relative h-16 w-16 overflow-hidden rounded-xl border border-white/10 bg-white/5"
-              >
-                <img
-                  src={image.dataUrl}
-                  alt={image.name}
-                  className="h-full w-full object-cover"
-                />
-
-                <button
-                  type="button"
-                  aria-label={`Remove ${image.name}`}
-                  onClick={() =>
-                    removeImage(image.name)
-                  }
-                  className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-white"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
+        {selectedFile && (
+          <div className="flex items-center gap-2 self-start rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+            {selectedFile.name.toLowerCase().endsWith(".pptx")
+              ? <Presentation size={16} />
+              : <FileText size={16} />}
+            <span className="max-w-xs truncate">{selectedFile.name}</span>
+            <button
+              type="button"
+              aria-label={`Remove ${selectedFile.name}`}
+              onClick={() => setSelectedFile(null)}
+              className="ml-1 rounded-full p-1 text-amber-100/80 transition hover:bg-white/10 hover:text-white"
+            >
+              <X size={14} />
+            </button>
           </div>
+        )}
+
+        {fileError && (
+          <p role="alert" className="text-sm text-red-300">{fileError}</p>
         )}
 
         {/* INPUT */}
@@ -262,17 +215,16 @@ const ChatInput = ({ onSend }) => {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
-              multiple
+              accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,.pptx"
               className="hidden"
-              onChange={handleImageSelect}
+              onChange={handleFileSelect}
             />
 
             {/* ATTACH */}
             <button
               type="button"
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.07] hover:text-white"
-              aria-label="Attach image"
+              aria-label="Attach PDF or PowerPoint"
               onClick={() =>
                 fileInputRef.current?.click()
               }
@@ -296,12 +248,13 @@ const ChatInput = ({ onSend }) => {
             onChange={(e) =>
               setValue(e.target.value)
             }
+            maxLength={6000}
             rows={1}
             placeholder={
-              selectedImages.length > 0
-                ? selectedAgentId === "chat"
-                  ? "Ask anything about this image..."
-                  : `Ask ${selectedAgent.label.toLowerCase()} about this image...`
+              selectedFile
+                ? value.trim()
+                  ? `Ask about ${selectedFile.name} or convert it...`
+                  : `Send to convert ${selectedFile.name} to the other format...`
                 : selectedAgentId === "chat"
                   ? "Ask anything..."
                   : `Ask ${selectedAgent.label.toLowerCase()} anything...`
@@ -313,13 +266,14 @@ const ChatInput = ({ onSend }) => {
           <button
             type="submit"
             disabled={
+              isLoading ||
               !value.trim() &&
-              !selectedImages.length
+              !selectedFile
             }
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
             aria-label={`Send message with ${selectedAgent.label} agent`}
           >
-            <ArrowUp size={18} />
+            {isLoading ? <LoaderCircle size={18} className="animate-spin" /> : <ArrowUp size={18} />}
           </button>
         </form>
       </div>
@@ -328,4 +282,3 @@ const ChatInput = ({ onSend }) => {
 };
 
 export default ChatInput;
-

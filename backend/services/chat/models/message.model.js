@@ -26,6 +26,14 @@ const artifactSchema = new mongoose.Schema(
       type: String,
     },
 
+    fileName: {
+      type: String,
+    },
+
+    mimeType: {
+      type: String,
+    },
+
     url: {
       type: String,
     },
@@ -68,6 +76,7 @@ const messageSchema = new mongoose.Schema(
       title:String,
       default: [],
     },
+
   },
   {
     timestamps: true,

@@ -4,8 +4,14 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Download, FileText, Presentation } from "lucide-react";
 
-function MessageBubble({ role, content, images = [] }) {
+function MessageBubble({
+  role,
+  content,
+  images = [],
+  artifacts = [],
+}) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -36,6 +42,28 @@ function MessageBubble({ role, content, images = [] }) {
     }
   };
 
+  const downloadArtifact = (artifact) => {
+    const bytes = Uint8Array.from(
+      atob(String(artifact.content || "")),
+      (character) => character.charCodeAt(0)
+    );
+    const isPptx = artifact.type === "pptx";
+    const blob = new Blob([bytes], { type: artifact.mimeType || "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = artifact.fileName || (isPptx ? "cortexai-presentation.pptx" : "cortexai-document.pdf");
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const downloadImage = (image, index) => {
+    const link = document.createElement("a");
+    link.href = image;
+    link.download = `cortexai-search-image-${index + 1}.${image.startsWith("data:image/jpeg") ? "jpg" : image.startsWith("data:image/webp") ? "webp" : "png"}`;
+    link.click();
+  };
+
   return (
     <>
       <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
@@ -60,19 +88,39 @@ function MessageBubble({ role, content, images = [] }) {
           {Array.isArray(images) && images.length > 0 && (
             <div className="mb-3 grid max-w-full gap-2 sm:grid-cols-2">
               {images.map((image, index) => (
-                <button
+                <div
                   key={`${image}-${index}`}
-                  type="button"
-                  onClick={() => setSelectedImage(image)}
-                  className="overflow-hidden rounded-xl border border-white/10 bg-white/5 text-left"
-                  aria-label={`Open image ${index + 1}`}
+                  className="overflow-hidden rounded-xl border border-white/10 bg-white/5"
                 >
-                  <img
-                    src={image}
-                    alt={`Message attachment ${index + 1}`}
-                    className="max-h-60 w-full object-cover transition duration-200 hover:scale-[1.01]"
-                  />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedImage(image)}
+                    className="block w-full text-left"
+                    aria-label={`Open image ${index + 1}`}
+                  >
+                    <img
+                      src={image}
+                      alt={`Message attachment ${index + 1}`}
+                      className="max-h-[32rem] w-full object-contain transition duration-200 hover:scale-[1.01]"
+                    />
+                  </button>
+                  {role === "assistant" && (
+                    <div className="flex items-center justify-between border-t border-white/10 px-2 py-1.5">
+                      <span className="text-[11px] text-slate-400">
+                        Image result
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => downloadImage(image, index)}
+                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-indigo-200 hover:bg-white/10"
+                        aria-label={`Download image ${index + 1}`}
+                      >
+                        <Download size={12} />
+                        Download
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -140,6 +188,18 @@ function MessageBubble({ role, content, images = [] }) {
               </div>
             )}
           </div>
+          {!isUser && artifacts.filter((artifact) => ["pdf", "pptx"].includes(artifact?.type)).map((artifact) => (
+            <button
+              key={artifact.fileName || artifact.title}
+              type="button"
+              onClick={() => downloadArtifact(artifact)}
+              className="mt-3 inline-flex items-center gap-2 rounded-lg border border-indigo-400/30 bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-100 transition hover:bg-indigo-500/20"
+            >
+              {artifact.type === "pptx" ? <Presentation size={14} /> : <FileText size={14} />}
+              <span>{artifact.fileName || (artifact.type === "pptx" ? "Generated PowerPoint" : "Generated PDF")}</span>
+              <Download size={14} />
+            </button>
+          ))}
         </div>
       </div>
 

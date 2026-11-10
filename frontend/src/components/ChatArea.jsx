@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import Nav from "./Nav";
 import MessageList from "./MessageList";
@@ -13,6 +13,8 @@ import {
 import api from "../../utils/axios";
 
 const ChatArea = ({ artifactPanelOpen, onOpenArtifacts }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingLabel, setLoadingLabel] = useState("");
   const { selectedConversation } = useSelector(
     (state) => state.conversation
   );
@@ -83,29 +85,33 @@ const ChatArea = ({ artifactPanelOpen, onOpenArtifacts }) => {
     prompt,
     conversation = selectedConversation,
     agentId = "chat",
-    attachmentImages = []
+    attachment = null
   ) => {
     const trimmedPrompt = prompt?.trim?.() ?? "";
+    const requestPrompt = trimmedPrompt || (
+      attachment?.name?.toLowerCase().endsWith(".pptx")
+        ? "Convert this PowerPoint presentation to PDF."
+        : "Convert this PDF to PowerPoint."
+    );
 
-    if (!trimmedPrompt && !attachmentImages.length) {
-      return;
-    }
+    if (!trimmedPrompt && !attachment) return;
 
     // Selected agent → trim + lowercase
     const normalizedAgentId = String(agentId || "chat")
       .trim()
       .toLowerCase();
 
-    console.log("Selected agent:", normalizedAgentId);
+    setIsLoading(true);
+    setLoadingLabel("Thinking...");
 
     let activeConversation = conversation;
 
     // Create conversation if there is no selected conversation
     if (!activeConversation) {
       const defaultTitle =
-        trimmedPrompt.length > 32
-          ? `${trimmedPrompt.slice(0, 32).trim()}...`
-          : trimmedPrompt || "New image chat";
+        requestPrompt.length > 32
+          ? `${requestPrompt.slice(0, 32).trim()}...`
+          : requestPrompt || "New chat";
 
       try {
         const created = await createConversation(defaultTitle);
@@ -140,14 +146,10 @@ const ChatArea = ({ artifactPanelOpen, onOpenArtifacts }) => {
     const userMessage = {
       _id: `user-${Date.now()}`,
       role: "user",
-      content:
-        trimmedPrompt ||
-        (attachmentImages.length
-          ? `Uploaded ${attachmentImages.length} image(s)`
-          : ""),
-      images: attachmentImages.map(
-        (image) => image.dataUrl || image.url || image
-      ),
+      content: [
+        requestPrompt,
+        attachment ? `Attached file: ${attachment.name}` : "",
+      ].filter(Boolean).join("\n"),
     };
 
     const optimisticMessages = [
@@ -178,13 +180,16 @@ const ChatArea = ({ artifactPanelOpen, onOpenArtifacts }) => {
 
     persistLocalMessages(optimisticMessages);
 
-    const safeHistory = Array.isArray(messages) ? messages.slice(-8) : [];
+    const safeHistory = Array.isArray(messages)
+      ? messages.slice(-8).map((message) => ({
+        role: message.role,
+        content: message.content,
+      }))
+      : [];
 
     try {
       const { data } = await api.post("/api/agent/chat", {
-        prompt:
-          trimmedPrompt ||
-          "Describe the uploaded image(s)",
+        prompt: requestPrompt,
 
         conversationId: activeConversation?._id,
 
@@ -193,12 +198,7 @@ const ChatArea = ({ artifactPanelOpen, onOpenArtifacts }) => {
 
         messages: safeHistory,
 
-        images: attachmentImages.map(
-          (image) =>
-            image.dataUrl ||
-            image.url ||
-            image
-        ),
+        attachment,
       });
 
       const aiText =
@@ -239,6 +239,8 @@ const ChatArea = ({ artifactPanelOpen, onOpenArtifacts }) => {
       dispatch(setMessages(finalMessages));
 
       persistLocalMessages(finalMessages);
+      setIsLoading(false);
+      setLoadingLabel("");
       return data;
     } catch (error) {
       const serverMessage =
@@ -249,16 +251,12 @@ const ChatArea = ({ artifactPanelOpen, onOpenArtifacts }) => {
       const fallbackReply = {
         _id: `assistant-${Date.now() + 2}`,
         role: "assistant",
-        content:
-          "I’m ready to help. Add GROQ_API_KEY or GEMINI_API_KEY to enable live AI responses.",
+        content: `The AI request failed: ${serverMessage}`,
       };
 
       const finalMessages = [
         ...optimisticMessages,
-        {
-          ...fallbackReply,
-          content: `${fallbackReply.content}\n\n_Error: ${serverMessage}_`,
-        },
+        fallbackReply,
       ];
 
       dispatch(setMessages(finalMessages));
@@ -269,6 +267,9 @@ const ChatArea = ({ artifactPanelOpen, onOpenArtifacts }) => {
         "Agent request failed:",
         error
       );
+      setIsLoading(false);
+      setLoadingLabel("");
+      throw error;
     }
   };
 
@@ -280,9 +281,15 @@ const ChatArea = ({ artifactPanelOpen, onOpenArtifacts }) => {
           onOpenArtifacts={onOpenArtifacts}
         />
 
-        <MessageList />
+        <MessageList
+          isLoading={isLoading}
+          loadingLabel={loadingLabel}
+        />
 
-        <ChatInput onSend={handleSendPrompt} />
+        <ChatInput
+          onSend={handleSendPrompt}
+          isLoading={isLoading}
+        />
       </div>
     </main>
   );

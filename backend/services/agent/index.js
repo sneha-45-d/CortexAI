@@ -19,7 +19,7 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "20mb" }));
 app.use("/",router)
 
 app.get("/", (req, res) => {
